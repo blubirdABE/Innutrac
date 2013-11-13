@@ -1,4 +1,3 @@
-
 package com.innutrac.poly.innutrac;
 
 import com.innutrac.poly.innutrac.PieWedge;
@@ -23,13 +22,24 @@ public class PieView extends View {
 	private int drawMode;
 	private Bitmap overlayBitmap;
 	private int overlayWidth;
+	private float adjustY;
+	
+	private PieWedge green;
+	private PieWedge blue;
+	private PieWedge purple;
+	private PieWedge pink;
+	private PieWedge red;
+	private PieWedge orange;
+	private PieWedge yellow;
+	
+	private boolean inside;
 	
 	int dimX, dimY;
 
 	public PieView(Context context) {
 		super(context);
 		overlayBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.piechart_shade, null);
-		// scale bitmap appropriately
+		
 		
 		WindowManager wm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
 		Display display = wm.getDefaultDisplay();
@@ -37,14 +47,8 @@ public class PieView extends View {
 		display.getSize(size);
 		dimX = size.x;
 		dimY = size.y;
-		
-		int scale = dimX - (dimX / 18);
-		overlayBitmap = Bitmap.createScaledBitmap(overlayBitmap, scale, scale, true);
-		overlayWidth = overlayBitmap.getWidth();
 
-		// Layout parameters for pie chart
-		setLayoutParams(new LayoutParams(overlayWidth, overlayWidth));
-		
+		inside = false;
 	}
 
 	public PieView(Context context, AttributeSet attrs) {
@@ -59,7 +63,7 @@ public class PieView extends View {
 		mBgPaints.setStyle(Paint.Style.FILL); // look further into this
 		mBgPaints.setColor(Color.BLUE);
 		mBgPaints.setStrokeWidth(0.5f);
-
+		
 		// Here there will be a data fetch for 8 proportion values (percentages)
 		// The following is sample data:
 		float greenVal, blueVal, purpleVal, pinkVal, redVal, orangeVal, yellowVal, drkGreenVal;
@@ -85,26 +89,36 @@ public class PieView extends View {
 
 		// Wedge data allocation
 		angle -= greenVal;
-		PieWedge green = new PieWedge(angle, greenVal, "#07B708");
+		green = new PieWedge(angle, greenVal, "#07B708");
 		angle -= blueVal;
-		PieWedge blue = new PieWedge(angle, blueVal, "#0083FC");
+		blue = new PieWedge(angle, blueVal, "#0083FC");
 		angle -= purpleVal;
-		PieWedge purple = new PieWedge(angle, purpleVal, "#8907B4");
+		purple = new PieWedge(angle, purpleVal, "#8907B4");
 		angle -= pinkVal;
-		PieWedge pink = new PieWedge(angle, pinkVal, "#FCA8F1");
+		pink = new PieWedge(angle, pinkVal, "#FCA8F1");
 		angle -= redVal;
-		PieWedge red = new PieWedge(angle, redVal, "#EC0808");
+		red = new PieWedge(angle, redVal, "#EC0808");
 		angle -= orangeVal;
-		PieWedge orange = new PieWedge(angle, orangeVal, "#F89F28");
+		orange = new PieWedge(angle, orangeVal, "#F89F28");
 		angle -= yellowVal;
-		PieWedge yellow = new PieWedge(angle, yellowVal, "#F8F628");
+		yellow = new PieWedge(angle, yellowVal, "#F8F628");
 		angle -= drkGreenVal;
+		// This is roughly where the overlay wedge drawing should occur
 
 		Paint tPaint = new Paint();
 		tPaint.setAlpha(0);
 		canvas.drawColor(tPaint.getColor());
+		
+		int scale = dimX - (dimX / 10);
+		overlayBitmap = Bitmap.createScaledBitmap(overlayBitmap, scale, scale, true);
+		overlayWidth = overlayBitmap.getWidth();
 
-		RectF mOvals = new RectF(7, 7, overlayWidth - 7, overlayWidth - 7);
+		RectF mOvals = new RectF(0, 0, overlayWidth, overlayWidth);
+		
+		float yFactor = (float) (overlayWidth / 1.5);
+		adjustY = (dimY / 2) - yFactor;
+		mOvals.offsetTo(((dimX / 2) - (overlayWidth / 2)), adjustY);
+		
 
 		if (drawMode == 1) {
 			// dark green
@@ -157,59 +171,86 @@ public class PieView extends View {
 			mBgPaints.setColor(Color.parseColor("#F59C3D"));
 			canvas.drawArc(mOvals, 180, 90, true, mBgPaints);
 		}
-		canvas.drawBitmap(overlayBitmap, 0.0f, 0.0f, null);
+		canvas.drawBitmap(overlayBitmap, ((dimX / 2) - (overlayWidth / 2)), adjustY, null);
 	}
-
+	
 	public void wedgeDetect(float x, float y)// Handle wedge tap detection here
 	{
 		int width = this.getWidth(); // this is the width of the pieChart!!
 
-		System.out.println("Xtap: " + x + "Ytap: " + y);
-
-		double distance = Math.sqrt(Math.pow((x - dimX), 2) + Math.pow((y - dimY), 2));
+		int yCoord = (int) ((dimY / 2) - adjustY);
+		double distance = Math.sqrt(Math.pow((x - (dimX / 2)), 2) + Math.pow((y - yCoord), 2));
 
 		// radius of circle is the width / 2
 		int radius = width / 2;
-
-		if (distance > radius) 
+		double tapAngle = 0;
+		
+		if (distance <= radius) 
 		{
-			System.out.println("Outside");
-			} else 
+			inside = true;
+			// need the tangent and adjacent values as distances
+			double xDistance = x - (dimX / 2);
+			double yDistance = yCoord - y;
+			
+			tapAngle = Math.toDegrees(Math.atan2(yDistance , xDistance));
+			
+			// must do this to comply with domain constraints of atan2 function
+			if (tapAngle < 0)
 			{
-				System.out.println("Inside!");
-				// need the tangent and adjacent values as distances!
-				double xDistance = Math.sqrt(Math.abs(x - dimX));
-				double yDistance = Math.sqrt(Math.abs(y - dimY));
-				double tapAngle = 0;
-				tapAngle = Math.atan((yDistance / xDistance)); // calculates basic angle, still need to check relative quadrant
-				System.out.println("Original angle: " + tapAngle);
-				tapAngle *= (57.2957795);
-				// Quadrant check:
-				if (x > dimX) // 2 positive X quadrants
-				{
-					if (y > dimY) {
-						tapAngle += (90 * 3);
-					}
-				} else 
-				{
-					if (y < dimY) {
-						tapAngle += 90;
-					} else {
-						tapAngle += (90 * 2);
-					}
-				}
-			System.out.println("Final Angle: " + tapAngle);
+				tapAngle += 360;
+			}
+		}else
+		{
+			inside = false;
 		}
 
-		// 1. check to see if the tap is inside of the circle -Done
-		// - calculate distance from tap to center and compare to radius of
-		// circle -Done
-		// 2. calculate relative angle for tap with respect to 0 degree
-		// - determine which quadrant the tap occurred in, add factor of 90 as
-		// needed
-		// 3. cross reference with the ranges of the wedges to determine which
-		// wedge it's in
-		// 4. use member variable angle from PieWedge class
+		// cross reference wedge data
+		if (tapAngle < (360 - green.getStartAngle()) && 
+				tapAngle >= ((360 - green.getStartAngle()) - green.getSweep()) && 
+				inside)
+		{
+			System.out.println("You just clicked green!!!!!!!!");
+		}else
+		if (tapAngle < (360 - blue.getStartAngle()) && 
+				tapAngle >= ((360 - blue.getStartAngle()) - blue.getSweep()) && 
+				inside)
+		{
+			System.out.println("You just clicked blue!!!!!!!!");
+		}else
+		if (tapAngle < (360 - purple.getStartAngle()) && 
+				tapAngle >= ((360 - purple.getStartAngle()) - purple.getSweep()) && 
+				inside)
+		{
+			System.out.println("You just clicked purple!!!!!!!!");
+		}else
+		if (tapAngle < (360 - pink.getStartAngle()) && 
+				tapAngle >= ((360 - pink.getStartAngle()) - pink.getSweep()) && 
+				inside)
+		{
+			System.out.println("You just clicked pink!!!!!!!!");
+		}else
+		if (tapAngle < (360 - red.getStartAngle()) && 
+				tapAngle >= ((360 - red.getStartAngle()) - red.getSweep()) && 
+				inside)
+		{
+			System.out.println("You just clicked red!!!!!!!!");
+		}else
+		if (tapAngle < (360 - orange.getStartAngle()) && 
+				tapAngle >= ((360 - orange.getStartAngle()) - orange.getSweep()) && 
+				inside)
+		{
+			System.out.println("You just clicked orange!!!!!!!!");
+		}else
+		if (tapAngle < (360 - yellow.getStartAngle()) && 
+				tapAngle >= ((360 - yellow.getStartAngle()) - yellow.getSweep()) && 
+				inside)
+		{
+			System.out.println("You just clicked yellow!!!!!!!!");
+		}else
+		if (inside)
+		{
+			System.out.println("You just clicked light green!!!!!!!!");
+		}
 	}
 
 	public void setMode(int mode) {

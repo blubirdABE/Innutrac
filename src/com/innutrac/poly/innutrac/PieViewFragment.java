@@ -3,6 +3,7 @@ package com.innutrac.poly.innutrac;
 import android.app.Fragment;
 import android.os.Bundle;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
@@ -24,5 +25,19 @@ public class PieViewFragment extends Fragment {
         pie = new PieView(getActivity());
         pie.setMode(factor);
         pieContainer.addView(pie);
+        
+        pieContainer.setOnTouchListener(new View.OnTouchListener() 
+      {
+              
+              @Override
+              public boolean onTouch(View v, MotionEvent event) 
+              {
+                      float x = event.getX();
+                      float y = event.getY();
+                      pie.wedgeDetect(x, y); // will send touch location
+                      // to PieView and appropriately change to detail view
+                      return false;
+              }
+      });
 	}
 }
